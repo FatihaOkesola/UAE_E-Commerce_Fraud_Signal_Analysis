@@ -101,3 +101,46 @@ ORDER BY fraud_pct DESC;
 -- Transactions with even one mismatch show elevated fraud rates, and the
 -- effect compounds when both mismatches are present.
 -- Geographic mismatch is the strongest categorical fraud signal found so far.
+
+-- =============================================
+-- SECTION D: USER PROFILE SIGNALS
+-- Testing whether user-level risk attributes
+-- predict fraudulent transactions
+-- =============================================
+--Do high-risk users have higher fraud rates?
+SELECT 
+    u.user_is_high_risk, 
+    COUNT(*) AS total_high_risk,
+    ROUND(SUM(CASE WHEN is_fraud = TRUE THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS risk_pct
+FROM transactions AS t
+JOIN users u ON u.user_id = t.user_id
+GROUP BY u.user_is_high_risk
+ORDER BY risk_pct DESC;
+
+-- INSIGHT:
+-- High-risk users have a significantly higher fraud rate (22.07%) compared
+-- to non-high-risk users (7.50%), a gap of nearly 15 percentage points.
+-- This is the strongest single fraud signal identified in this analysis,
+-- suggesting that the user_is_high_risk flag is a reliable fraud predictor.
+-- However, it is worth noting that high-risk users account for only 4,871
+-- transactions out of 100,000 -- meaning most fraud still comes from users
+-- not flagged as high risk. Relying solely on this flag would miss the
+-- the majority of fraudulent transactions.
+
+-- Do fraudulent transactions come from users with more previous chargebacks?
+SELECT 
+    t.is_fraud,
+    COUNT(*) AS total_chargebacks,
+    ROUND(AVG(u.user_prev_chargebacks), 2) AS avg_user_chargebacks
+FROM transactions AS t
+JOIN users u ON u.user_id = t.user_id
+GROUP BY t.is_fraud
+ORDER BY avg_user_chargebacks;
+
+-- INSIGHT:
+-- Fraudulent transactions come from users with a higher average chargeback
+-- history (0.10) compared to legitimate ones (0.02).
+-- While the relative difference is significant (5x), the absolute values
+-- are too small to make this a reliable standalone predictor.
+-- Most fraudulent users have zero previous chargebacks, meaning this signal
+-- is most useful in combination with other variables rather than on its own.
