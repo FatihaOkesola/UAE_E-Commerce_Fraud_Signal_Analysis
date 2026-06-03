@@ -327,3 +327,255 @@ ORDER BY fraud_pct DESC;
 -- such as geographic mismatch or elevated IP risk score.
 -- The odd_hour boolean flag captures this window reasonably well and
 -- is the simpler variable to implement in a real-time scoring system.
+
+-- =============================================
+-- SECTION G: FRAUD FLAG ANALYSIS
+-- Querying the Fraud_Flags table to identify which
+-- fraud trigger types fire most frequently and which
+-- combinations are most associated with confirmed fraud.
+-- These flags are pre-computed risk signals designed
+-- specifically for fraud detection and represent the
+-- most direct indicators available in this dataset.
+-- =============================================
+
+-- How often does each flag fire across all transactions? 
+SELECT 
+    SUM(CASE WHEN fraud_flag_ip = TRUE THEN 1 ELSE 0 END) AS ip_flag_count,
+    ROUND(SUM(CASE WHEN fraud_flag_ip = TRUE THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS ip_flag_pct,
+    SUM(CASE WHEN fraud_flag_mismatch = TRUE THEN 1 ELSE 0 END) AS mismatch_flag_count,
+    ROUND(SUM(CASE WHEN fraud_flag_mismatch = TRUE THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS mismatch_flag_pct,
+    SUM(CASE WHEN fraud_flag_velocity = TRUE THEN 1 ELSE 0 END) AS velocity_flag_count,
+    ROUND(SUM(CASE WHEN fraud_flag_velocity = TRUE THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS velocity_flag_pct,
+    SUM(CASE WHEN fraud_flag_new_account = TRUE THEN 1 ELSE 0 END) AS new_account_flag_count,
+    ROUND(SUM(CASE WHEN fraud_flag_new_account = TRUE THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS new_account_flag_pct,
+    SUM(CASE WHEN fraud_flag_prev_cb = TRUE THEN 1 ELSE 0 END) AS prev_cb_flag_count,
+    ROUND(SUM(CASE WHEN fraud_flag_prev_cb = TRUE THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS prev_cb_flag_pct,
+    SUM(CASE WHEN fraud_flag_odd_hour = TRUE THEN 1 ELSE 0 END) AS odd_hour_flag_count,
+    ROUND(SUM(CASE WHEN fraud_flag_odd_hour = TRUE THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS odd_hour_flag_pct,
+    COUNT(*) AS total_transactions
+FROM fraud_flags;
+
+-- INSIGHT:
+-- The odd_hour flag fires most frequently (25.04% of transactions),
+-- followed by new_account (18.02%). The remaining flags fire rarely --
+-- ip_flag (3.55%), mismatch (3.16%), and prev_cb (2.98%).
+-- The velocity flag never fires (0.00%), which explains why transaction
+-- velocity showed no signal in Section B and raises a data quality concern
+-- about whether this flag was correctly computed in the dataset.
+-- Importantly, frequency of firing does not indicate reliability as a
+-- fraud detector. A flag that fires on 25% of transactions may simply
+-- reflect normal platform behavior -- odd hours are expected on an
+-- international e-commerce platform serving customers across time zones.
+-- Similarly, new account flags firing on 18% of transactions may reflect
+-- genuine platform growth rather than fraud patterns.
+-- To assess reliability, each flag must be tested against confirmed fraud
+-- outcomes, not just firing frequency.
+-- This distinction also highlights the natural limit of rule-based SQL
+-- analysis -- determining whether a flag is truly anomalous for a specific
+-- customer requires comparison to that customer's own history or similar
+-- customers' behavior. That contextual comparison is what the ML phase
+-- will address using similarity-based models such as KNN.
+
+-- Which flags are most reliable when they fire?
+SELECT 
+    'ip_flag' AS flag_name,
+    COUNT(*) AS times_fired,
+    SUM(CASE WHEN t.is_fraud = TRUE THEN 1 ELSE 0 END) AS confirmed_fraud,
+    ROUND(SUM(CASE WHEN t.is_fraud = TRUE THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS fraud_rate_pct
+FROM fraud_flags ff
+JOIN transactions t ON t.transaction_id = ff.transaction_id
+WHERE ff.fraud_flag_ip = TRUE
+UNION ALL
+SELECT 
+    'mismatch_flag' AS flag_name,
+    COUNT(*) AS times_fired,
+    SUM(CASE WHEN t.is_fraud = TRUE THEN 1 ELSE 0 END) AS confirmed_fraud,
+    ROUND(SUM(CASE WHEN t.is_fraud = TRUE THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS fraud_rate_pct
+FROM fraud_flags ff
+JOIN transactions t ON t.transaction_id = ff.transaction_id
+WHERE ff.fraud_flag_mismatch = TRUE
+UNION ALL
+SELECT 
+    'velocity_flag' AS flag_name,
+    COUNT(*) AS times_fired,
+    SUM(CASE WHEN t.is_fraud = TRUE THEN 1 ELSE 0 END) AS confirmed_fraud,
+    ROUND(SUM(CASE WHEN t.is_fraud = TRUE THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS fraud_rate_pct
+FROM fraud_flags ff
+JOIN transactions t ON t.transaction_id = ff.transaction_id
+WHERE ff.fraud_flag_velocity = TRUE
+UNION ALL
+SELECT 
+    'new_account_flag' AS flag_name,
+    COUNT(*) AS times_fired,
+    SUM(CASE WHEN t.is_fraud = TRUE THEN 1 ELSE 0 END) AS confirmed_fraud,
+    ROUND(SUM(CASE WHEN t.is_fraud = TRUE THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS fraud_rate_pct
+FROM fraud_flags ff
+JOIN transactions t ON t.transaction_id = ff.transaction_id
+WHERE ff.fraud_flag_new_account = TRUE
+UNION ALL
+SELECT 
+    'prev_cb_flag' AS flag_name,
+    COUNT(*) AS times_fired,
+    SUM(CASE WHEN t.is_fraud = TRUE THEN 1 ELSE 0 END) AS confirmed_fraud,
+    ROUND(SUM(CASE WHEN t.is_fraud = TRUE THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS fraud_rate_pct
+FROM fraud_flags ff
+JOIN transactions t ON t.transaction_id = ff.transaction_id
+WHERE ff.fraud_flag_prev_cb = TRUE
+UNION ALL
+SELECT 
+    'odd_hour_flag' AS flag_name,
+    COUNT(*) AS times_fired,
+    SUM(CASE WHEN t.is_fraud = TRUE THEN 1 ELSE 0 END) AS confirmed_fraud,
+    ROUND(SUM(CASE WHEN t.is_fraud = TRUE THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS fraud_rate_pct
+FROM fraud_flags ff
+JOIN transactions t ON t.transaction_id = ff.transaction_id
+WHERE ff.fraud_flag_odd_hour = TRUE
+ORDER BY fraud_rate_pct DESC;
+
+-- INSIGHT:
+-- When tested for reliability, the flag ranking changes significantly
+-- compared to the frequency ranking in the previous query.
+-- prev_cb_flag is the highest precision signal -- when it fires, 27.24%
+-- of those transactions are confirmed fraud. However it fires rarely
+-- (2,981 times), meaning it catches only a small portion of total fraud.
+-- This explains why it appeared weak in Section D where the average
+-- chargeback count was near zero -- the signal is strong but narrow.
+-- ip_flag (16.05%) and mismatch_flag (11.13%) are consistent with
+-- findings in Sections B and C respectively, confirming they are
+-- reliable mid-frequency signals worth incorporating into detection rules.
+-- new_account_flag fires frequently (18,017 times) but has a moderate
+-- fraud rate (12.69%), suggesting many new account flags are legitimate
+-- new customers rather than fraudsters.
+-- odd_hour_flag has the lowest fraud rate (9.65%) despite firing most
+-- frequently (25,041 times), confirming the finding from Section F --
+-- odd hours reflect normal international platform behavior rather than
+-- fraud patterns.
+-- velocity_flag fires zero times, confirming the data quality concern
+-- identified in the previous query.
+-- RECOMMENDATION FOR RISK TEAM:
+-- Prioritise prev_cb_flag for high precision targeted intervention,
+-- ip_flag and mismatch_flag for broad reliable detection, and
+-- new_account_flag as a moderate signal requiring additional context.
+-- odd_hour_flag should be deprioritised as a standalone rule.
+-- The distinction between frequency and precision is critical --
+-- a flag that fires rarely but reliably is more actionable than one
+-- that fires constantly with weak discrimination.
+
+-- Which flag combinations appear most in confirmed fraud?
+SELECT 
+    (ff.fraud_flag_ip::INT + 
+     ff.fraud_flag_mismatch::INT + 
+     ff.fraud_flag_velocity::INT + 
+     ff.fraud_flag_new_account::INT + 
+     ff.fraud_flag_prev_cb::INT + 
+     ff.fraud_flag_odd_hour::INT) AS total_flags_fired,
+    COUNT(*) AS total_transactions,
+    SUM(CASE WHEN t.is_fraud = TRUE THEN 1 ELSE 0 END) AS confirmed_fraud,
+    ROUND(SUM(CASE WHEN t.is_fraud = TRUE THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS fraud_rate_pct
+FROM fraud_flags ff
+JOIN transactions t ON t.transaction_id = ff.transaction_id
+GROUP BY total_flags_fired
+ORDER BY total_flags_fired DESC;
+
+-- INSIGHT:
+-- The relationship between flag count and fraud rate is clear and consistent.
+-- As the number of flags fired increases, the fraud rate rises significantly:
+-- 0 flags: 5.84% | 1 flag: 9.96% | 2 flags: 16.15% | 
+-- 3 flags: 26.15% | 4 flags: 41.67%
+-- Each additional flag fired approximately doubles the fraud rate,
+-- suggesting that flags compound each other's predictive power rather
+-- than overlapping on the same transactions.
+-- However, 55,721 transactions have zero flags fired yet still contain
+-- 3,256 confirmed fraudulent transactions -- 39.65% of all fraud
+-- (3,256 of 8,211 total fraudulent transactions) goes undetected
+-- by the existing flag system entirely.
+-- This is the most important finding in this section and confirms the
+-- central limitation identified throughout this analysis -- the current
+-- rule-based flag system has significant coverage gaps that cannot be
+-- closed by adding more rules alone.
+-- RECOMMENDATION FOR RISK TEAM:
+-- Transactions with 3 or more flags fired should be treated as high
+-- priority for immediate review or blocking -- a 26-42% fraud rate
+-- justifies strong intervention at that threshold.
+-- Transactions with 2 flags warrant step-up authentication.
+-- Single flag transactions warrant a modest risk score increase only.
+-- Most importantly, the 39.65% of fraud occurring in zero-flag
+-- transactions cannot be caught by rule-based systems alone.
+-- This gap is the primary justification for building a machine learning
+-- model in the next phase -- ML can identify subtle patterns across
+-- multiple variables simultaneously that no individual flag or rule
+-- combination can capture.
+
+-- =============================================
+-- SECTION H: SIGNAL RANKING SUMMARY
+-- A consolidated ranking of all signals tested
+-- throughout this analysis, ordered by predictive
+-- strength. This serves as the risk team's priority
+-- guide for which signals to act on first and
+-- provides the feature selection foundation for
+-- the ML phase.
+-- =============================================
+
+-- Summary: Which signals should the risk team prioritise
+-- and which features should the ML model focus on?
+-- This query consolidates all findings into a single
+-- ranked reference table.
+
+-- What is the ranked priority of all signals tested?
+SELECT 'prev_cb_flag' AS signal, 27.24 AS fraud_rate_pct, 'Strong — high precision, low frequency' AS signal_strength
+UNION ALL
+SELECT 'user_is_high_risk', 22.07, 'Strong — highest spread, low coverage'
+UNION ALL
+SELECT 'ip_flag', 16.05, 'Strong — reliable mid-frequency signal'
+UNION ALL
+SELECT 'new_account_flag', 12.69, 'Moderate — high frequency, moderate precision'
+UNION ALL
+SELECT 'geographic_mismatch_both', 11.96, 'Moderate — compounds with other signals'
+UNION ALL
+SELECT 'odd_hour_flag', 9.65, 'Weak — reflects platform behavior not fraud'
+UNION ALL
+SELECT 'merchant_category', 8.73, 'Weak — less than 1% spread across categories'
+UNION ALL
+SELECT 'payment_method', 8.69, 'Weak — less than 1% spread across methods'
+UNION ALL
+SELECT 'device_type', 8.24, 'Weak — less than 1% spread across devices'
+UNION ALL
+SELECT 'transaction_amount', 8.21, 'Weak standalone — behavioral signal only'
+UNION ALL
+SELECT 'transaction_velocity', 0.00, 'No signal — flag never fires in this dataset'
+ORDER BY fraud_rate_pct DESC;
+
+-- INSIGHT:
+-- This ranking consolidates all signals tested across Sections A through G
+-- into a single priority guide for the risk team and feature selection
+-- reference for the ML phase.
+-- Three signals stand out as strong predictors:
+-- prev_cb_flag (27.24%) is the highest precision signal but fires rarely,
+-- making it a targeted rather than broad detection tool.
+-- user_is_high_risk (22.07%) has the largest fraud rate gap but covers
+-- only 13.09% of actual fraud, confirming it cannot stand alone.
+-- ip_flag (16.05%) is the most balanced signal -- reliable, mid-frequency,
+-- and available in real time at the point of transaction.
+-- Two signals show moderate predictive value:
+-- new_account_flag (12.69%) and geographic_mismatch (11.96%) both add
+-- meaningful lift when combined with stronger signals.
+-- Five signals are weak standalone predictors:
+-- odd_hour, merchant category, payment method, device type, and
+-- transaction amount all show less than 2% spread and should not
+-- trigger fraud rules independently.
+-- transaction_velocity provides no signal in this dataset.
+-- RECOMMENDATION FOR RISK TEAM:
+-- Prioritise ip_flag, user_is_high_risk, and prev_cb_flag as the
+-- foundation of any rule-based detection system.
+-- Incorporate new_account_flag and geographic_mismatch as supporting
+-- signals that increase risk scores when present alongside stronger signals.
+-- The signal ranking also serves as the feature importance guide for
+-- the ML phase -- strong signals here are the features most likely
+-- to drive model performance in the Python classification model.
+-- However, as shown in Section G, 39.65% of fraud occurs in transactions
+-- with zero flags fired, confirming that ML is not optional -- it is
+-- the only way to close the coverage gap that rule-based systems cannot.
+-- =============================================
+-- END OF SQL ANALYSIS
+-- Next phase: Python EDA and ML Classification
+-- =============================================
