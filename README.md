@@ -38,7 +38,7 @@ Three normalized tables designed from scratch:
 - **Fraud_Flags** — six specific fraud trigger flags per transaction 
   (100,000 records)
 
-See `Credit_Card_Fraud_diagram.png` for the full ERD.
+See `erdplus-Credit_card.png` for the full ERD.
 
 ---
 
