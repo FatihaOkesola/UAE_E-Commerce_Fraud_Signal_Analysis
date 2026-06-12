@@ -83,7 +83,7 @@ gap. This is the primary justification for the ML phase.
 - [x] Database design and ERD
 - [x] Data loading and validation
 - [x] SQL fraud analysis
-- [ ] Python EDA
+- [x] Python EDA
 - [ ] ML classification model
 
 ---
