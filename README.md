@@ -1,16 +1,10 @@
 # UAE E-Commerce Fraud Signal Analysis
+## Phase 1: SQL — Database Design and Fraud Signal Analysis
 
-## Overview
-This project analyzes 100,000 synthetic UAE e-commerce transactions to identify 
-which signals are most predictive of fraudulent activity. The analysis is 
-structured as a three-phase project, with each phase building on the previous:
+This repository covers the first phase of a three-part fraud analytics project 
+analyzing 100,000 synthetic UAE e-commerce transactions.
 
-- **Phase 1: SQL** — Database design, schema normalization, and structured 
-  fraud signal analysis
-- **Phase 2: Python** — Exploratory data analysis and visualization *(in progress)*
-- **Phase 3: ML** — Fraud classification model *(coming)*
-
-The analysis is framed from the perspective of a fraud analytics analyst 
+The analysis is written from the perspective of a fraud analytics analyst 
 at a payments company, with findings translated into actionable recommendations 
 for a risk team.
 
@@ -43,13 +37,11 @@ See `erdplus-Credit_card.png` for the full ERD.
 ---
 
 ## SQL Analysis Structure
-The SQL phase tests eleven signals across eight sections, moving from 
-weak categorical variables to stronger behavioral and user profile signals:
+Eight sections testing eleven signals, moving from weak categorical 
+variables to stronger behavioral and user profile signals:
 
-- **Section A** — Categorical variables: merchant category, device type, 
-  payment method
-- **Section B** — Behavioral and network signals: IP risk score, 
-  transaction velocity
+- **Section A** — Categorical variables: merchant category, device type, payment method
+- **Section B** — Behavioral and network signals: IP risk score, transaction velocity
 - **Section C** — Geographic mismatch signals
 - **Section D** — User profile signals: high risk flag, previous chargebacks
 - **Section E** — Transaction amount analysis
@@ -59,7 +51,7 @@ weak categorical variables to stronger behavioral and user profile signals:
 
 ---
 
-## Key SQL Findings
+## Key Findings
 Three signals stand out as strong fraud predictors:
 - **prev_cb_flag** — 27.24% fraud rate when fired, highest precision signal
 - **user_is_high_risk** — 22.07% fraud rate, but covers only 13% of actual fraud
@@ -75,7 +67,7 @@ device type, and transaction amount.
 
 Most importantly, 39.65% of fraud occurs in transactions with zero flags 
 fired — confirming that rule-based systems alone cannot close the detection 
-gap. This is the primary justification for the ML phase.
+gap and justifying the need for a machine learning model in Phase 3.
 
 ---
 
@@ -83,13 +75,18 @@ gap. This is the primary justification for the ML phase.
 - [x] Database design and ERD
 - [x] Data loading and validation
 - [x] SQL fraud analysis
-- [x] Python EDA
-- [ ] ML classification model
 
 ---
 
 ## Tools
-PostgreSQL · pgAdmin · Python · pandas · matplotlib · scikit-learn
+PostgreSQL · pgAdmin
+
+---
+
+## Project Phases
+- **Phase 1: SQL** — Database design and fraud signal analysis *(this repo)*
+- **Phase 2: Python EDA** — Visualizations and pattern validation *(coming)*
+- **Phase 3: ML** — Fraud classification model *(coming)*
 
 ---
 
